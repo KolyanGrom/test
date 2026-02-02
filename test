@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Каталог товаров</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .products {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .product-card {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 15px;
+      padding: 20px;
+      transition: transform 0.3s;
+      cursor: pointer;
+    }
+
+    .product-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .product-image {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+
+    .product-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .product-price {
+      color: #4ade80;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .btn {
+      background: linear-gradient(45deg, #4ade80, #22d3ee);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.3s;
+    }
+
+    .btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .cart-counter {
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 20px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🎨 Каталог товаров</h1>
+    <p>Выберите товары для заказа</p>
+    <div id="user-info" style="margin-top: 10px; font-size: 14px; opacity: 0.8;"></div>
+  </div>
+
+  <div class="products" id="products-container">
+    <!-- Товары будут загружены через JavaScript -->
+  </div>
+
+  <button class="btn" onclick="sendOrderToBot()">🛒 Оформить заказ</button>
+</div>
+
+<div id="cart-counter" class="cart-counter" style="display: none;">0</div>
+
+<script>
+  // Инициализация Telegram Web App
+  const tg = window.Telegram.WebApp;
+
+  // Расширяем приложение на весь экран
+  tg.expand();
+
+  // Получаем данные пользователя
+  const user = tg.initDataUnsafe.user;
+
+  // Отображаем информацию о пользователе
+  if (user) {
+    document.getElementById('user-info').innerHTML = `
+                👤 ${user.first_name} ${user.last_name || ''}
+                @${user.username || 'без username'}
+            `;
+  }
+
+  // Массив товаров
+  const products = [
+    {
+      id: 1,
+      name: "Набор для маникюра Premium",
+      price: 2490,
+      image: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400&h=300&fit=crop"
+    },
+    {
+      id: 2,
+      name: "Лак стойкий 12 дней",
+      price: 890,
+      image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w-400&h=300&fit=crop"
+    },
+    {
+      id: 3,
+      name: "Гель-лак с блестками",
+      price: 1250,
+      image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=300&fit=crop"
+    },
+    {
+      id: 4,
+      name: "Профессиональная пилка",
+      price: 450,
+      image: "https://images.unsplash.com/photo-1607779097040-9e6bde98e8f8?w=400&h=300&fit=crop"
+    },
+    {
+      id: 5,
+      name: "Масло для кутикулы",
+      price: 690,
+      image: "https://images.unsplash.com/photo-1596703923538-b6d4bb0a44ea?w=400&h=300&fit=crop"
+    },
+    {
+      id: 6,
+      name: "База и топ премиум",
+      price: 1890,
+      image: "https://images.unsplash.com/photo-1573301564620-7b7d940e7e6c?w=400&h=300&fit=crop"
+    }
+  ];
+
+  // Корзина
+  let cart = [];
+
+  // Отображаем товары
+  function renderProducts() {
+    const container = document.getElementById('products-container');
+    container.innerHTML = '';
+
+    products.forEach(product => {
+      const productCard = document.createElement('div');
+      productCard.className = 'product-card';
+      productCard.innerHTML = `
+                    <img src="${product.image}" alt="${product.name}" class="product-image">
+                    <div class="product-title">${product.name}</div>
+                    <div class="product-price">${product.price} ₽</div>
+                    <button onclick="addToCart(${product.id})" style="margin-top: 10px; padding: 10px; width: 100%; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                        Добавить в корзину
+                    </button>
+                `;
+      container.appendChild(productCard);
+    });
+  }
+
+  // Добавление в корзину
+  function addToCart(productId) {
+    const product = products.find(p => p.id === productId);
+    cart.push(product);
+    updateCartCounter();
+
+    // Виброотклик (если поддерживается)
+    if (tg.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred('light');
+    }
+  }
+
+  // Обновление счетчика корзины
+  function updateCartCounter() {
+    const counter = document.getElementById('cart-counter');
+    counter.textContent = cart.length;
+    counter.style.display = cart.length > 0 ? 'flex' : 'none';
+  }
+
+  // Отправка заказа боту
+  function sendOrderToBot() {
+    if (cart.length === 0) {
+      alert('Корзина пуста!');
+      return;
+    }
+
+    const orderSummary = cart.map(item => `• ${item.name} - ${item.price} ₽`).join('\n');
+    const total = cart.reduce((sum, item) => sum + item.price, 0);
+
+    // Отправляем данные боту
+    tg.sendData(JSON.stringify({
+      action: 'create_order',
+      products: cart,
+      total: total,
+      user_id: user?.id,
+      timestamp: new Date().toISOString()
+    }));
+
+    // Закрываем Web App
+    tg.close();
+  }
+
+  // Инициализация
+  tg.ready();
+  renderProducts();
+
+  // Обработка темы Telegram
+  function updateTheme() {
+    if (tg.colorScheme === 'dark') {
+      document.body.style.background = '#1a1a1a';
+    }
+  }
+
+  tg.onEvent('themeChanged', updateTheme);
+  updateTheme();
+</script>
+</body>
+</html>
